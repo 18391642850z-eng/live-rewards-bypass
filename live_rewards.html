@@ -1496,26 +1496,9 @@ function resetBalance() {
   goHome(); // getTx() 会自动重新播种
 }
 
-/* ============ 安全防护 ============ */
-
-// 域名锁定（真实模式启用；演示模式本地打开不受限）
-if (!DEMO_MODE) {
-  const host = location.hostname;
-  if (!ALLOWED_HOSTS.includes(host)) {
-    /* 非白名单域名 → 替换为拒绝内容 */
-    document.body.innerHTML =
-      '<div class="denied" style="background:#0f0f0f;color:#fff;min-height:100vh;display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center;padding:40px;">' +
-      '<h1 style="font-size:24px;font-weight:800;">Access Denied</h1>' +
-      '<p style="margin-top:12px;font-size:14px;color:#9a9a9a;">This page is not available on this domain.</p></div>';
-  }
-}
-
-// 禁用右键 / 查看源代码等
-document.addEventListener('contextmenu', e => e.preventDefault());
-document.addEventListener('keydown', e => {
-  if ((e.ctrlKey && (e.key === 'u' || e.key === 'U' || e.key === 's' || e.key === 'S')) ||
-      e.key === 'F12') e.preventDefault();
-});
+/* ============ 安全防护（已移除域名锁定和右键禁用） ============ */
+// 域名锁定已移除 — 允许在任何域名上访问
+// 右键/查看源码禁用已移除 — 方便调试
 
 /* ============ 启动 ============ */
 /* === 绕过补丁：自动进入首页，不走登录，不被踢 === */
