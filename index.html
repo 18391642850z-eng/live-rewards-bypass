@@ -1,0 +1,1559 @@
+<!DOCTYPE html>
+<!-- 拉米团队 · TikTok LIVE Rewards 兑换系统前端（演示模式/真实模式双模一体） -->
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap" rel="stylesheet">
+<title>TikTok LIVE Rewards</title>
+<style>
+  * { margin:0; padding:0; box-sizing:border-box; -webkit-tap-highlight-color:transparent; }
+  html { -webkit-text-size-adjust:100%; text-size-adjust:100%; height:100%; }
+  html,body { height:100%; }
+  /* 交互元素：消除移动端 300ms 点击延迟 + 防双击缩放 + 防误选文字 */
+  button, a, [onclick], .coin-card, .key, .topbar-icon, .menu-item, .back-btn, .withdraw-box, .sheet-all, .learn-more {
+    touch-action:manipulation;
+    -webkit-user-select:none; user-select:none;
+    -webkit-tap-highlight-color:transparent;
+  }
+  input, textarea { -webkit-user-select:text; user-select:text; }
+  body {
+    background:#fff;
+    font-family:'Inter', 'TikTok Sans', -apple-system, "Segoe UI", "Helvetica Neue", Roboto, Arial, sans-serif;
+    color:#0f0f0f;
+    display:flex;
+    justify-content:center;
+    -webkit-font-smoothing:antialiased;
+    overscroll-behavior-y:none;
+  }
+
+  .app {
+    width:100%;
+    max-width:420px;
+    background:#fff;
+    position:relative;
+    min-height:100dvh;
+    min-height:100vh;
+    overflow-x:hidden;
+    box-shadow:0 0 30px rgba(0,0,0,.5);
+  }
+  .screen { display:none; min-height:100dvh; min-height:100vh; padding-bottom:110px; background:#fff; }
+  .screen.active { display:block; will-change:transform,opacity; }
+  .screen.active.anim-fwd { animation:slideInRight .32s cubic-bezier(.22,.68,.42,1); }
+  .screen.active.anim-back { animation:slideInLeft .32s cubic-bezier(.22,.68,.42,1); }
+  @keyframes slideInRight { from { opacity:0; transform:translateX(32px);} to { opacity:1; transform:none;} }
+  @keyframes slideInLeft { from { opacity:0; transform:translateX(-32px);} to { opacity:1; transform:none;} }
+  @keyframes fadeUp { from { opacity:0; transform:translateY(10px);} to { opacity:1; transform:none;} }
+  @keyframes popIn { 0% { transform:scale(.3); opacity:0;} 70% { transform:scale(1.12);} 100% { transform:scale(1); opacity:1;} }
+  @keyframes drawCheck { to { stroke-dashoffset:0; } }
+  .anim-fade { animation:fadeUp .45s cubic-bezier(.22,.68,.42,1) both; }
+
+  /* ---------- 顶部横幅 ---------- */
+  .banner {
+    position:relative; z-index:3;
+    display:flex; align-items:center; gap:12px;
+    background:#fafafa; padding:12px 16px; border-bottom:1px solid #ececee;
+  }
+  .banner-icon {
+    width:38px; height:38px; flex:0 0 38px; border-radius:10px;
+    background:#0f0f0f; display:flex; align-items:center; justify-content:center;
+  }
+  .banner-icon svg { width:22px; height:22px; }
+  .banner-text { flex:1; min-width:0; }
+  .banner-title { font-size:12px; color:#8a8a8a; font-weight:600; }
+  .banner-sub { font-size:13px; font-weight:600; color:#0f0f0f; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+  .banner-right { display:flex; align-items:center; gap:10px; color:#8a8a8a; }
+  .banner-now { font-size:11px; font-weight:600; }
+  .banner-close { background:none; border:none; font-size:20px; line-height:1; color:#0f0f0f; cursor:pointer; }
+
+  /* ---------- 兑换成功通知浮层（软件内弹窗） ---------- */
+  .toast {
+    position:fixed; top:0; left:50%; transform:translateX(-50%);
+    width:100%; max-width:420px; z-index:80;
+    display:none;
+  }
+  .toast.show {
+    display:flex; flex-direction:column;
+    animation:toastIn .45s cubic-bezier(.22,.68,.42,1);
+    box-shadow:0 8px 30px rgba(0,0,0,.16);
+  }
+  .toast.hide { animation:toastOut .3s cubic-bezier(.4,0,.6,1) forwards; }
+  @keyframes toastIn { from { opacity:0; transform:translateY(-100%);} to { opacity:1; transform:translateY(0);} }
+  @keyframes toastOut { from { opacity:1; transform:translateY(0);} to { opacity:0; transform:translateY(-100%);} }
+  .toast .banner { border-radius:0 0 12px 12px; border-bottom:1px solid #ececee; }
+
+  /* ---------- 顶部导航栏（兑换页） ---------- */
+  .top-nav { display:flex; align-items:center; height:48px; padding:0 12px; background:#fff; border-bottom:1px solid #ececee; }
+  .top-nav .back-btn { width:36px; height:36px; display:flex; align-items:center; justify-content:center; background:transparent; border:none; font-size:22px; line-height:1; color:#0f0f0f; cursor:pointer; padding:0; }
+  .top-nav .back-btn:active { background:#f1f1f3; border-radius:50%; }
+  .top-nav-title { flex:1; text-align:center; font-size:16px; font-weight:600; color:#0f0f0f; }
+  .top-nav-spacer { width:36px; height:36px; }
+
+  .content { padding:18px 20px 0; }
+
+  /* ---------- 首页顶部导航栏（返回 + 设置三点） ---------- */
+  .home-topbar {
+    position:relative; display:flex; align-items:center; justify-content:space-between;
+    padding:14px 16px 0; background:#fff; width:100%;
+  }
+  .home-topbar .topbar-icon {
+    width:38px; height:38px; display:flex; align-items:center; justify-content:center;
+    color:#0f0f0f; cursor:pointer;
+  }
+  .home-topbar .topbar-icon svg { width:22px; height:22px; }
+  .home-topbar .topbar-icon:active { background:#f1f1f3; border-radius:50%; }
+  .home-topbar .topbar-title { flex:1; text-align:center; font-size:16px; font-weight:600; color:#0f0f0f; }
+
+  /* 设置菜单弹层（点右上角三个点弹出） */
+  .menu-mask { display:none; position:fixed; inset:0; z-index:90; background:rgba(0,0,0,.45); }
+  .menu-mask.show { display:block; animation:fadeIn .2s; }
+  @keyframes fadeIn { from { opacity:0; } to { opacity:1; } }
+  .menu-pop {
+    position:absolute; top:56px; right:16px; width:220px; background:#fff;
+    border-radius:14px; padding:6px 0; box-shadow:0 10px 40px rgba(0,0,0,.2);
+    animation:popMenu .18s cubic-bezier(.22,.68,.42,1);
+  }
+  @keyframes popMenu { from { opacity:0; transform:translateY(-6px);} to { opacity:1; transform:none;} }
+  .menu-item {
+    width:100%; text-align:left; padding:13px 18px; border:none; background:transparent;
+    font-size:15px; font-weight:500; color:#0f0f0f; cursor:pointer; font-family:inherit;
+  }
+  .menu-item:active { background:#f2f2f7; }
+  .menu-item + .menu-item { border-top:1px solid #f0f0f2; }
+  .menu-item.danger { color:#fe2c55; }
+
+  /* 修改金额弹窗 */
+  .amount-mask { display:none; position:fixed; inset:0; z-index:95; background:rgba(0,0,0,.45); align-items:center; justify-content:center; }
+  .amount-mask.show { display:flex; }
+  .amount-modal { width:84%; max-width:340px; background:#fff; border-radius:20px; padding:24px 22px 20px; text-align:center; }
+  .amount-modal h3 { font-size:17px; font-weight:700; margin-bottom:6px; }
+  .amount-modal p { font-size:13px; color:#9a9a9a; margin-bottom:16px; }
+  .amount-field { border:1.5px solid #e3e3e8; border-radius:12px; padding:14px 16px; margin-bottom:18px; text-align:left; }
+  .amount-field input { width:100%; border:none; outline:none; font-size:17px; font-weight:600; font-family:inherit; background:transparent; color:#0f0f0f; }
+  .amount-field .pre { font-size:14px; color:#9a9a9a; font-weight:600; }
+
+  /* ---------- Exchange Confirmation 确认弹窗 ---------- */
+  .conf-mask { display:none; position:fixed; inset:0; z-index:96; background:rgba(0,0,0,.45); align-items:center; justify-content:center; }
+  .conf-mask.show { display:flex; }
+  .conf-modal { width:86%; max-width:360px; background:#fff; border-radius:20px; padding:26px 22px 20px; }
+  .conf-title { text-align:center; font-size:18px; font-weight:700; margin-bottom:22px; }
+  .conf-rows { margin-bottom:24px; }
+  .conf-row { display:flex; align-items:center; justify-content:space-between; padding:11px 0; border-bottom:1px solid #f0f0f2; }
+  .conf-row:last-child { border-bottom:none; }
+  .conf-key { font-size:13.5px; color:#8a8a8a; }
+  .conf-val { font-size:14px; font-weight:600; color:#0f0f0f; display:flex; align-items:center; gap:7px; }
+  .conf-ava { width:22px; height:22px; border-radius:50%; background:#ececec; display:inline-flex; align-items:center; justify-content:center; font-size:11px; color:#fff; font-weight:700; overflow:hidden; }
+  .conf-confirm { display:block; width:100%; background:#fe2c55; color:#fff; border:none; border-radius:12px; padding:15px 0; font-size:16px; font-weight:600; cursor:pointer; font-family:inherit; }
+  .conf-confirm:active { opacity:.85; }
+  .conf-cancel { display:block; width:100%; background:#f2f2f7; color:#0f0f0f; border:none; border-radius:12px; padding:15px 0; font-size:16px; font-weight:600; cursor:pointer; margin-top:10px; font-family:inherit; }
+  .conf-cancel:active { opacity:.8; }
+
+  /* 兑换确认后的全屏转圈过渡遮罩 */
+  .ex-loading-mask {
+    position:fixed; inset:0; z-index:97; background:rgba(255,255,255,.92);
+    display:none; flex-direction:column; align-items:center; justify-content:center;
+    -webkit-backdrop-filter:blur(4px); backdrop-filter:blur(4px);
+  }
+  .ex-loading-mask.visible { display:flex; animation:exFadeIn .2s ease; }
+  .ex-loading-spinner {
+    width:46px; height:46px; border:4px solid rgba(254,44,85,.12); border-top-color:#fe2c55;
+    border-radius:50%; animation:spin .7s linear infinite;
+  }
+  .ex-loading-text { margin-top:18px; font-size:14px; color:#8a8a8a; font-weight:600; letter-spacing:.2px; }
+  @keyframes exFadeIn { from { opacity:0; } to { opacity:1; } }
+
+  /* ---------- 拒绝页 ---------- */
+  .denied { min-height:100vh; background:#0f0f0f; display:flex; flex-direction:column; align-items:center; justify-content:center; color:#fff; text-align:center; padding:40px; }
+  .denied-icon { width:72px; height:72px; border-radius:50%; background:rgba(254,44,85,.15); display:flex; align-items:center; justify-content:center; margin-bottom:22px; }
+  .denied-icon svg { width:34px; height:34px; }
+  .denied h1 { font-size:24px; font-weight:800; letter-spacing:-.3px; }
+  .denied p { margin-top:12px; font-size:14px; color:#9a9a9a; line-height:1.6; max-width:280px; }
+
+  /* ---------- 登录页 ---------- */
+  .auth { min-height:100vh; background:#fff; display:flex; flex-direction:column; padding:60px 28px 0; }
+  .auth-logo { width:64px; height:64px; border-radius:18px; background:#0f0f0f; display:flex; align-items:center; justify-content:center; margin-bottom:26px; }
+  .auth-logo svg { width:34px; height:34px; }
+  .auth h1 { font-size:28px; font-weight:700; letter-spacing:-.5px; }
+  .auth .auth-sub { margin-top:8px; font-size:14px; color:#8a8a8a; }
+  .auth-form { margin-top:34px; display:flex; flex-direction:column; gap:16px; }
+  .auth-field { border:1px solid #e5e5e5; border-radius:14px; padding:14px 16px; background:#fafafa; }
+  .auth-field input { width:100%; border:none; outline:none; background:transparent; font-size:16px; font-family:inherit; }
+  .auth-field input::placeholder { color:#bdbdbd; }
+  .auth-error { min-height:20px; font-size:13px; color:#fe2c55; font-weight:600; }
+  .auth-btn {
+    margin-top:8px; background:#fe2c55; color:#fff; font-size:17px; font-weight:700;
+    border:none; border-radius:14px; padding:16px 0; cursor:pointer;
+  }
+  .auth-btn:active { opacity:.85; }
+  .auth-note { margin-top:26px; font-size:12px; color:#bdbdbd; text-align:center; line-height:1.6; }
+  .auth-note b { color:#8a8a8a; }
+
+  /* ---------- 通用 ---------- */
+  .promo-box { background:#f7f7f9; border-radius:12px; padding:14px 16px; margin:16px 0 4px; }
+  .promo-text { font-size:13px; color:#9a9a9a; line-height:1.55; font-weight:400; }
+  .learn-more { display:inline-block; margin-top:10px; font-size:13px; font-weight:500; color:#fe2c55; text-decoration:underline; }
+
+  .reward-row { display:flex; gap:12px; margin:22px 0 8px; }
+  .reward-card { flex:1; background:#fff; border:1px solid #e6e6ea; border-radius:14px; padding:14px 16px; }
+  .reward-label { font-size:11px; color:#9a9a9a; font-weight:500; margin-bottom:6px; }
+  .reward-val { font-size:20px; font-weight:500; letter-spacing:-.3px; }
+
+  .center-block { text-align:center; padding-top:18px; }
+  .big-label { font-size:15px; font-weight:600; }
+  .big-amount { font-size:44px; font-weight:600; letter-spacing:-1.5px; margin-top:10px; line-height:1; }
+  .convert-line { margin-top:12px; font-size:13px; color:#666; }
+  .convert-line .dollar { color:#fe2c55; }
+
+  /* TikTok 音符金币（金色渐变球 + 白色音符，内嵌 SVG） */
+  .coin {
+    display:inline-block; width:16px; height:16px; vertical-align:middle; position:relative; top:-1px;
+    background:url("data:image/png;base64,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") center/contain no-repeat;
+  }
+  .coin.lg { width:20px; height:20px; top:-1px; }
+
+  .btn-primary {
+    display:block; width:100%; margin-top:26px;
+    background:#fe2c55; color:#fff; font-size:17px; font-weight:600;
+    border:none; border-radius:12px; padding:16px 0; cursor:pointer; transition:opacity .12s;
+  }
+  .btn-primary:active { opacity:.85; }
+  .btn-primary:disabled { background:#f5a3b4; cursor:not-allowed; }
+
+  .section-title { text-align:center; font-size:17px; font-weight:600; margin:30px 0 12px; }
+  .section-title.left { text-align:left; font-size:15px; font-weight:700; }
+  .muted-center { text-align:center; font-size:12.5px; color:#9a9a9a; }
+
+  /* Withdraw 灰色方框（与 Exchange 红色按钮同尺寸同文字样式） */
+  .withdraw-box {
+    display:block; width:100%; margin-top:12px;
+    background:#f7f7f9; color:#0f0f0f; font-size:17px; font-weight:600;
+    border:1.5px solid #d9d9de; border-radius:12px; padding:16px 0;
+    text-align:center; cursor:pointer; transition:opacity .12s;
+  }
+  .withdraw-box:active { opacity:.85; }
+
+  .tx-list { margin-top:8px; }
+  .tx-item { padding:12px 0; border-bottom:1px solid #e6e6ea; }
+  .tx-item:last-child { border-bottom:none; }
+  .tx-row { display:flex; justify-content:space-between; align-items:baseline; gap:10px; }
+  .tx-main { font-size:14.5px; font-weight:400; }
+  .tx-main b { font-weight:600; }
+  .tx-main .at { font-weight:400; color:#333; }
+  .tx-amt { color:#fe2c55; font-weight:600; font-size:14.5px; white-space:nowrap; letter-spacing:-.2px; }
+  .tx-time { margin-top:4px; font-size:12.5px; color:#9a9a9a; }
+
+  /* ============ 兑换页 ============ */
+  .coins-balance { text-align:center; padding-top:6px; }
+  .cb-title { font-size:16px; font-weight:600; }
+  .cb-amount { font-size:42px; font-weight:600; letter-spacing:-1.5px; margin-top:10px; line-height:1; }
+  .cb-note { margin-top:12px; font-size:13px; color:#666; }
+  .cb-avail { margin-top:6px; font-size:12.5px; color:#9a9a9a; }
+
+  .field-label { font-size:15px; font-weight:600; margin-top:26px; }
+
+  /* 胶囊输入框：灰色描边，聚焦变红（与参考截图一致） */
+  .input-wrap {
+    margin-top:10px; display:flex; align-items:center; gap:10px;
+    border:1.5px solid #e3e3e8; border-radius:999px; padding:14px 18px;
+    background:#fff; transition:border-color .15s;
+  }
+  .input-wrap:focus-within { border-color:#fe2c55; }
+  .input-wrap .at-icon { color:#9a9a9a; font-size:18px; }
+  .input-wrap input { border:none; outline:none; flex:1; font-size:16px; font-family:inherit; background:transparent; color:#0f0f0f; }
+  .input-wrap input::placeholder { color:#bdbdbd; }
+  .input-wrap .search-btn { border:none; background:transparent; color:#fe2c55; font-weight:600; font-size:14px; cursor:pointer; padding:0 2px; font-family:inherit; }
+
+  /* 搜索 loading 转圈（红色，居中） */
+  .spinner {
+    display:none; width:34px; height:34px; margin:20px auto 4px;
+    border:3.5px solid rgba(254,44,85,.14); border-top-color:#fe2c55;
+    border-radius:50%; animation:spin .75s linear infinite;
+  }
+  .spinner.visible { display:block; }
+  @keyframes spin { to { transform:rotate(360deg); } }
+
+  /* 搜索状态与结果 */
+  .search-status { margin-top:8px; font-size:12.5px; }
+  .search-status.loading { color:#8a8a8a; }
+  .search-status.error { color:#fe2c55; font-weight:600; }
+  .user-result {
+    margin-top:12px; display:none; align-items:center; gap:12px;
+    background:#fff; border:1px solid #e6e6ea; border-radius:14px; padding:12px 14px;
+  }
+  .user-result.visible { display:flex; animation:fadeUp .35s cubic-bezier(.22,.68,.42,1); }
+  .user-avatar {
+    width:40px; height:40px; border-radius:50%; flex:0 0 40px;
+    display:flex; align-items:center; justify-content:center;
+    color:#fff; font-weight:800; font-size:17px;
+  }
+  .user-meta { flex:1; min-width:0; }
+  .user-nick { font-size:14.5px; font-weight:600; display:flex; align-items:center; gap:5px; }
+  .user-handle { font-size:12.5px; color:#8a8a8a; margin-top:2px; }
+  .veri-badge { width:16px; height:16px; flex:0 0 16px; }
+
+  .coin-cards { display:flex; gap:13px; margin-top:14px; }
+  .coin-card {
+    flex:1; background:#fff; border:1.5px solid #ececf0; border-radius:12px;
+    padding:13px 4px 11px; text-align:center; cursor:pointer;
+    transition:border-color .18s, transform .18s, box-shadow .18s; will-change:transform;
+  }
+  .coin-card .coin.lg { width:20px; height:20px; margin:0 auto; top:0; }
+  .coin-card .c-coin { font-size:15.5px; font-weight:600; margin-top:7px; letter-spacing:-.2px; }
+  .coin-card .c-usd { margin-top:3px; font-size:12.5px; color:#666; }
+  .coin-card.selected { border-color:#fe2c55; transform:translateY(-2px); box-shadow:0 6px 16px rgba(254,44,85,.14); }
+  .coin-card:active { transform:scale(.96); }
+
+  .custom-wrap { margin-top:18px; border-bottom:1px solid #d9d9de; padding-bottom:12px; cursor:pointer; }
+  .custom-wrap input { width:100%; border:none; outline:none; font-size:16px; font-family:inherit; background:transparent; color:#0f0f0f; cursor:pointer; }
+  .custom-wrap input::placeholder { color:#bdbdbd; }
+
+  /* ============ Custom 底部弹层（自定义数字键盘） ============ */
+  .sheet-mask {
+    position:fixed; inset:0; z-index:60; background:rgba(0,0,0,.45);
+    opacity:0; pointer-events:none; transition:opacity .25s;
+  }
+  .sheet-mask.active { opacity:1; pointer-events:auto; }
+  .sheet {
+    position:absolute; left:0; right:0; bottom:0; max-width:420px; margin:0 auto;
+    background:#f7f7f9; border-radius:22px 22px 0 0;
+    padding:14px 18px calc(18px + env(safe-area-inset-bottom));
+    transform:translateY(100%); transition:transform .32s cubic-bezier(.22,.68,.42,1);
+    max-height:88vh; overflow-y:auto; -webkit-overflow-scrolling:touch; overscroll-behavior:contain;
+  }
+  .sheet-mask.active .sheet { transform:translateY(0); will-change:transform; }
+  .sheet-head { display:flex; align-items:center; justify-content:space-between; margin-bottom:16px; }
+  .sheet-title { font-size:16px; font-weight:700; }
+  .sheet-close { background:none; border:none; font-size:22px; line-height:1; color:#0f0f0f; cursor:pointer; padding:2px 6px; }
+
+  .sheet-label { font-size:13px; font-weight:600; margin-bottom:8px; }
+  .sheet-input {
+    display:flex; align-items:center; gap:10px;
+    background:#fff; border:1.5px solid #e3e3e8; border-radius:999px;
+    padding:13px 16px; transition:border-color .15s;
+  }
+  /* 输入了金币后泛红，更醒目 */
+  .sheet-input.active { border-color:#fe2c55; box-shadow:0 0 0 3px rgba(254,44,85,.08); }
+  .sheet-value { flex:1; font-size:16px; font-weight:600; color:#0f0f0f; white-space:nowrap; overflow:hidden; }
+  .sheet-value.empty { color:#bdbdbd; font-weight:500; }
+  .sheet-all { border:none; background:#f2f2f7; color:#666; font-size:12.5px; font-weight:600; border-radius:99px; padding:6px 14px; cursor:pointer; font-family:inherit; }
+  .sheet-balance { margin-top:10px; font-size:11.5px; color:#9a9a9a; }
+
+  .keypad { display:grid; grid-template-columns:repeat(3,1fr); gap:10px; margin-top:16px; }
+  .key {
+    background:#fff; border:none; border-radius:14px; padding:16px 0;
+    font-size:22px; font-weight:600; font-family:inherit; color:#0f0f0f;
+    cursor:pointer; position:relative;
+    box-shadow:0 1px 0 rgba(0,0,0,.02), 0 2px 6px rgba(0,0,0,.06), 0 6px 14px rgba(0,0,0,.05);
+    border:1px solid rgba(0,0,0,.02);
+    transition:transform .08s, background .12s, box-shadow .12s;
+  }
+  /* 顶部细高光，模拟 iOS 按键质感 */
+  .key::before {
+    content:""; position:absolute; left:8px; right:8px; top:0; height:1px;
+    background:linear-gradient(90deg, rgba(255,255,255,0), rgba(255,255,255,.9), rgba(255,255,255,0));
+    border-radius:14px;
+  }
+  .key:active { transform:scale(.95); background:#f4f4f8; box-shadow:0 1px 2px rgba(0,0,0,.08); }
+  .key.del { font-size:19px; }
+
+  .sheet-total {
+    display:flex; justify-content:space-between; align-items:center;
+    margin-top:16px; padding-top:14px; border-top:1px solid #e8e8ec;
+  }
+  .sheet-total .t-label { font-size:15px; font-weight:700; }
+  .sheet-total .t-val { font-size:14px; font-weight:400; color:#0f0f0f; }
+
+  .sheet-policy { margin-top:14px; font-size:12px; color:#9a9a9a; line-height:1.6; }
+  .sheet-policy a { color:#3b82f6; text-decoration:none; font-weight:600; }
+  .sheet-exchange {
+    display:block; width:100%; margin-top:14px;
+    background:#fe2c55; color:#fff; font-size:16px; font-weight:600;
+    border:none; border-radius:12px; padding:15px 0; cursor:pointer;
+    transition:opacity .12s, transform .1s; font-family:inherit;
+  }
+  .sheet-exchange:active { opacity:.85; transform:scale(.98); }
+
+  .policy { margin-top:22px; font-size:13px; color:#85858c; line-height:1.7; }
+  .policy a { color:#3b82f6; text-decoration:none; font-weight:600; }
+  .form-error { margin-top:8px; font-size:12.5px; color:#fe2c55; font-weight:600; min-height:18px; }
+
+  .fixed-bottom {
+    position:fixed; left:0; right:0; bottom:0; width:100%; max-width:420px; margin:0 auto;
+    padding:14px 20px calc(14px + env(safe-area-inset-bottom)); background:#f1f1f3; border-top:1px solid #e7e7ea;
+  }
+  .fixed-bottom .btn-primary { margin-top:0; }
+
+  /* ============ 成功页 ============ */
+  .success-head { text-align:center; padding-top:34px; }
+  .check-circle {
+    width:76px; height:76px; border-radius:50%; margin:0 auto;
+    background:#00b95f; display:flex; align-items:center; justify-content:center;
+    box-shadow:0 6px 18px rgba(0,185,95,.28);
+    animation:popIn .55s cubic-bezier(.34,1.56,.64,1) both;
+  }
+  .check-circle svg { width:38px; height:38px; }
+  .check-circle svg path {
+    stroke-dasharray:42; stroke-dashoffset:42;
+    animation:drawCheck .4s .25s ease forwards;
+  }
+  @keyframes drawCheck { to { stroke-dashoffset:0; } }
+  .success-title { font-size:26px; font-weight:800; margin-top:22px; letter-spacing:-.4px; animation:fadeUp .5s .2s both; }
+  .success-sub { margin-top:12px; font-size:15px; color:#333; animation:fadeUp .5s .3s both; }
+
+  .detail-table { margin-top:26px; }
+  .detail-row { display:flex; justify-content:space-between; align-items:center; padding:15px 0; border-bottom:1px solid #f2f2f2; animation:fadeUp .4s both; }
+  .detail-row:nth-child(1) { animation-delay:.35s; }
+  .detail-row:nth-child(2) { animation-delay:.42s; }
+  .detail-row:nth-child(3) { animation-delay:.49s; }
+  .detail-row:nth-child(4) { animation-delay:.56s; }
+  .detail-row:last-child { border-bottom:none; }
+  .detail-key { font-size:14px; color:#9a9a9a; }
+  .detail-val { font-size:15px; font-weight:700; }
+
+  .gifter-card { display:flex; gap:14px; align-items:flex-start; margin-top:30px; padding:16px; background:#fafafa; border-radius:16px; animation:fadeUp .5s .62s both; }
+  .gifter-icon { width:46px; height:46px; flex:0 0 46px; border-radius:12px; background:#0f0f0f; display:flex; align-items:center; justify-content:center; }
+  .gifter-icon svg { width:24px; height:24px; }
+  .gifter-title { font-size:16px; font-weight:700; }
+  .gifter-desc { margin-top:6px; font-size:12.5px; color:#8a8a8a; line-height:1.6; }
+
+  .btn-green {
+    display:flex; width:100%; align-items:center; justify-content:center; gap:8px;
+    background:#00b95f; color:#fff; font-size:17px; font-weight:700;
+    border:none; border-radius:12px; padding:16px 0; cursor:pointer;
+    transition:opacity .12s, transform .1s;
+  }
+  .btn-green:active { opacity:.85; transform:scale(.98); }
+  .btn-green .arrow { font-size:18px; }
+
+  /* 交易条目滑入 */
+  .tx-item.tx-new { animation:fadeUp .4s cubic-bezier(.22,.68,.42,1); }
+
+  /* 按钮按压反馈 */
+  .btn-primary, .auth-btn, .modal-btn, .search-btn { transition:opacity .12s, transform .1s; }
+  .btn-primary:active, .auth-btn:active, .modal-btn:active, .search-btn:active { transform:scale(.97); }
+
+  /* ============ 踢人弹窗 ============ */
+  .modal-mask { display:none; position:fixed; inset:0; z-index:99; background:rgba(0,0,0,.5); align-items:center; justify-content:center; }
+  .modal-mask.active { display:flex; }
+  .modal-box { width:84%; max-width:340px; background:#fff; border-radius:20px; padding:26px 22px 20px; text-align:center; }
+  .modal-box h3 { font-size:17px; font-weight:800; }
+  .modal-box p { margin-top:10px; font-size:13.5px; color:#666; line-height:1.6; }
+  .modal-btn-row { display:flex; gap:10px; margin-top:22px; }
+  .modal-btn { flex:1; padding:13px 0; border-radius:12px; font-size:15px; font-weight:700; border:none; cursor:pointer; }
+  .modal-btn.gray { background:#f2f2f7; color:#0f0f0f; }
+  .modal-btn.red { background:#fe2c55; color:#fff; }
+
+  /* 低调水印（拉米团队） */
+  .watermark { position:fixed; bottom:4px; right:6px; font-size:9px; color:rgba(0,0,0,.14); z-index:5; pointer-events:none; user-select:none; }
+  body.light-watermark .watermark { color:rgba(255,255,255,.12); }
+</style>
+</head>
+<body>
+<div class="app">
+
+  <!-- 兑换成功通知浮层（软件内弹窗，送完 coins 才弹） -->
+  <div class="toast" id="toast">
+    <div class="banner">
+      <div class="banner-icon">
+        <svg viewBox="0 0 24 24" fill="#fff"><path d="M16.5 3c.4 2.1 1.8 3.6 4 3.9v2.9c-1.5 0-2.9-.4-4-1.1v6.6c0 3.3-2.6 5.7-5.8 5.6-3.1-.1-5.4-2.4-5.4-5.5 0-3 2.3-5.4 5.4-5.5.3 0 .6 0 .9.1v3c-.3-.1-.6-.1-.9-.1-1.4 0-2.5 1.1-2.5 2.5 0 1.4 1.1 2.5 2.5 2.5 1.4 0 2.6-1.1 2.6-2.5V3h3.2z"/></svg>
+      </div>
+      <div class="banner-text">
+        <div class="banner-title">TikTok LIVE Rewards</div>
+        <div class="banner-sub">Successfully sent coins to recipient</div>
+      </div>
+      <div class="banner-right"><span class="banner-now">Now</span><button class="banner-close" id="toast-close">&times;</button></div>
+    </div>
+  </div>
+
+  <!-- ============ 拒绝页（无 token / token 无效） ============ -->
+  <div class="screen" id="screen-access">
+    <div class="denied">
+      <div class="denied-icon">
+        <svg viewBox="0 0 24 24" fill="none" stroke="#fe2c55" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/>
+        </svg>
+      </div>
+      <h1>Access Denied</h1>
+      <p>This page is protected. Please use the link provided to access your rewards.</p>
+      <!-- 演示模式一键入口（真实模式隐藏） -->
+      <button id="demo-enter" style="display:none;margin-top:26px;background:#fe2c55;color:#fff;border:none;border-radius:14px;padding:14px 34px;font-size:15px;font-weight:700;cursor:pointer;">Enter Demo</button>
+    </div>
+  </div>
+
+  <!-- ============ 登录页 ============ -->
+  <div class="screen" id="screen-auth">
+    <div class="auth">
+      <div class="auth-logo">
+        <svg viewBox="0 0 24 24" fill="#fff"><path d="M16.5 3c.4 2.1 1.8 3.6 4 3.9v2.9c-1.5 0-2.9-.4-4-1.1v6.6c0 3.3-2.6 5.7-5.8 5.6-3.1-.1-5.4-2.4-5.4-5.5 0-3 2.3-5.4 5.4-5.5.3 0 .6 0 .9.1v3c-.3-.1-.6-.1-.9-.1-1.4 0-2.5 1.1-2.5 2.5 0 1.4 1.1 2.5 2.5 2.5 1.4 0 2.6-1.1 2.6-2.5V3h3.2z"/></svg>
+      </div>
+      <h1>LIVE Rewards</h1>
+      <div class="auth-sub">Sign in to access your rewards balance</div>
+      <div class="auth-form">
+        <div class="auth-field"><input type="email" id="auth-email" placeholder="Email" autocomplete="off"></div>
+        <div class="auth-field"><input type="password" id="auth-password" placeholder="Password"></div>
+        <div class="auth-error" id="auth-error"></div>
+        <button class="auth-btn" id="auth-btn" onclick="handleLogin()">Continue</button>
+      </div>
+      <div class="auth-note" id="auth-note"><b>Secure access</b> · one device at a time</div>
+    </div>
+  </div>
+
+  <!-- ============ 首页 ============ -->
+  <div class="screen" id="screen-home">
+    <div class="home-topbar">
+      <span class="topbar-icon" onclick="backToAuth()" aria-label="Back">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M15 18l-6-6 6-6"/></svg>
+      </span>
+      <div class="topbar-title">LIVE Rewards</div>
+      <span class="topbar-icon" onclick="toggleMenu(event)" aria-label="Settings">
+        <svg viewBox="0 0 24 24" fill="currentColor"><circle cx="12" cy="5" r="2"/><circle cx="12" cy="12" r="2"/><circle cx="12" cy="19" r="2"/></svg>
+      </span>
+    </div>
+    <div class="content">
+      <div class="promo-box">
+        <p class="promo-text">Your dedication to quality content could get you a rewards percentage of up to 53%.</p>
+        <a class="learn-more" href="javascript:void 0">Learn more</a>
+      </div>
+
+      <div class="reward-row">
+        <div class="reward-card">
+          <div class="reward-label">Available rewards</div>
+          <div class="reward-val" id="home-available">$978,467,758.75</div>
+        </div>
+        <div class="reward-card">
+          <div class="reward-label">Upcoming rewards</div>
+          <div class="reward-val" id="home-upcoming">$167,290.62</div>
+        </div>
+      </div>
+
+      <div class="center-block">
+        <div class="big-label">Available rewards</div>
+        <div class="big-amount" id="home-amount">$978,467,758.75</div>
+        <div class="convert-line">= <span class="dollar" id="home-amount2">$978,467,758.75</span> (<span class="coin"></span> <span id="home-coins">94,697,717.616</span>)</div>
+      </div>
+
+      <button class="btn-primary" onclick="goExchange()">Exchange</button>
+
+      <div class="withdraw-box">Withdraw</div>
+      <p class="muted-center" style="margin-top:10px;">Daily withdrawal limit (Remain/Total): $1,000/$1,000</p>
+
+      <h2 class="section-title left" style="margin-top:34px;">Transactions</h2>
+      <div class="tx-list" id="tx-list"></div>
+    </div>
+  </div>
+
+  <!-- ============ 兑换页 ============ -->
+  <div class="screen" id="screen-exchange">
+    <div class="top-nav">
+      <button class="back-btn" onclick="goHome()" aria-label="Back">&#8592;</button>
+      <div class="top-nav-title">Exchange</div>
+      <div class="top-nav-spacer"></div>
+    </div>
+    <div class="content">
+      <div class="coins-balance">
+        <div class="cb-title">TikTok Coins Balance</div>
+        <div class="cb-amount" id="ex-amount">$978,467,756.21</div>
+        <div class="cb-note">= <span class="dollar" style="color:#fe2c55;" id="ex-amount2">$978,467,756.21</span> (<span class="coin"></span> <span id="ex-coins">94,697,717.406</span>)</div>
+        <div class="cb-avail">Available balance to exchange the Coins</div>
+      </div>
+
+      <div class="field-label">TikTok username</div>
+      <div class="input-wrap">
+        <span class="at-icon">@</span>
+        <input type="text" id="tiktok-user" placeholder="your TikTok handle" autocomplete="off" oninput="onUserInput()" onkeydown="if(event.key==='Enter'){event.preventDefault();searchUser();}">
+        <button class="search-btn" onclick="searchUser()">Search</button>
+      </div>
+      <div class="spinner" id="search-spinner"></div>
+      <div class="search-status" id="search-status"></div>
+      <div class="user-result" id="user-result">
+        <div class="user-avatar" id="ur-avatar">?</div>
+        <div class="user-meta">
+          <div class="user-nick"><span id="ur-nick">-</span><svg class="veri-badge" id="ur-veri" style="display:none" viewBox="0 0 24 24" fill="#20d5ec"><path d="M12 2l2.4 2.4 3.3-.5.6 3.3 3 1.6-1.5 3 1.5 3-3 1.6-.6 3.3-3.3-.5L12 22l-2.4-2.4-3.3.5-.6-3.3-3-1.6 1.5-3-1.5-3 3-1.6.6-3.3 3.3.5z"/><path d="M10.6 14.2l-2-2-1.2 1.2 3.2 3.2 6-6-1.2-1.2z" fill="#fff"/></svg></div>
+          <div class="user-handle" id="ur-handle">@-</div>
+        </div>
+      </div>
+
+      <div class="field-label">Exchange earnings for Coins</div>
+      <div class="coin-cards">
+        <div class="coin-card selected" data-coins="250" data-usd="3.03" onclick="pickCoin(this)"><span class="coin lg"></span><div class="c-coin">250</div><div class="c-usd">$3.03</div></div>
+        <div class="coin-card" data-coins="500" data-usd="6.07" onclick="pickCoin(this)"><span class="coin lg"></span><div class="c-coin">500</div><div class="c-usd">$6.07</div></div>
+        <div class="coin-card" data-coins="15000" data-usd="182.04" onclick="pickCoin(this)"><span class="coin lg"></span><div class="c-coin">15,000</div><div class="c-usd">$182.04</div></div>
+      </div>
+
+      <div class="custom-wrap" onclick="openSheet()">
+        <input type="text" id="custom-coins" placeholder="Enter a custom number or amount" readonly onclick="openSheet()">
+      </div>
+
+      <div class="form-error" id="ex-error"></div>
+
+      <p class="policy">
+        Coins obtained through this exchange are subject to the TikTok
+        <a href="javascript:void 0">Virtual Items Policy</a>. Since you are accepting your
+        Rewards in the form of Coins, this exchange is also subject to our
+        <a href="javascript:void 0">Rewards Policy</a>. This exchange cannot be
+        canceled or reversed.
+      </p>
+    </div>
+
+    <div class="fixed-bottom">
+      <button class="btn-primary" id="ex-submit" onclick="submitExchange()">Exchange</button>
+    </div>
+  </div>
+
+  <!-- ============ 成功页 ============ -->
+  <div class="screen" id="screen-success">
+    <div class="content">
+      <div class="success-head">
+        <div class="check-circle">
+          <svg viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12.5l4.5 4.5L19 7.5"/></svg>
+        </div>
+        <div class="success-title">Exchange Completed!</div>
+        <div class="success-sub">You exchanged for <span class="coin"></span> <b id="succ-coins">46,000</b> Coins</div>
+      </div>
+
+      <div class="detail-table">
+        <div class="detail-row"><div class="detail-key">Recipient</div><div class="detail-val" id="succ-recipient">@oppo32615</div></div>
+        <div class="detail-row"><div class="detail-key">Coins Exchanged</div><div class="detail-val"><span id="succ-exchanged">46,000</span> Coins</div></div>
+        <div class="detail-row"><div class="detail-key">Deducted Amount</div><div class="detail-val" id="succ-amount">$556.60</div></div>
+        <div class="detail-row"><div class="detail-key">Time</div><div class="detail-val" id="succ-time">01/09/2026, 06:59:51</div></div>
+      </div>
+
+      <div class="gifter-card">
+        <div class="gifter-icon">
+          <svg viewBox="0 0 24 24" fill="#fff"><path d="M16.5 3c.4 2.1 1.8 3.6 4 3.9v2.9c-1.5 0-2.9-.4-4-1.1v6.6c0 3.3-2.6 5.7-5.8 5.6-3.1-.1-5.4-2.4-5.4-5.5 0-3 2.3-5.4 5.4-5.5.3 0 .6 0 .9.1v3c-.3-.1-.6-.1-.9-.1-1.4 0-2.5 1.1-2.5 2.5 0 1.4 1.1 2.5 2.5 2.5 1.4 0 2.6-1.1 2.6-2.5V3h3.2z"/></svg>
+        </div>
+        <div>
+          <div class="gifter-title">Start gifter level</div>
+          <div class="gifter-desc">Send your first Gift to begin your gifter journey and unlock more rewards as you level up.</div>
+        </div>
+      </div>
+    </div>
+
+    <div class="fixed-bottom">
+      <button class="btn-green" onclick="goHome()"><span class="arrow">&#8592;</span> Go back</button>
+    </div>
+  </div>
+
+  <!-- Exchange Confirmation 确认弹窗（点 Exchange 后弹出） -->
+  <div class="conf-mask" id="conf-mask" onclick="closeConfirm()">
+    <div class="conf-modal" onclick="event.stopPropagation()">
+      <div class="conf-title">Exchange Confirmation</div>
+      <div class="conf-rows">
+        <div class="conf-row"><div class="conf-key">TikTok Account</div><div class="conf-val"><span class="conf-ava" id="conf-ava"></span><span id="conf-user">@user</span></div></div>
+        <div class="conf-row"><div class="conf-key">Followers</div><div class="conf-val" id="conf-followers">-</div></div>
+        <div class="conf-row"><div class="conf-key">Coins</div><div class="conf-val"><span class="coin"></span> <span id="conf-coins">0</span> Coins</div></div>
+        <div class="conf-row"><div class="conf-key">Amount</div><div class="conf-val" id="conf-amount">$0.00</div></div>
+      </div>
+      <button class="conf-confirm" onclick="confirmExchange()">Confirm Exchange</button>
+      <button class="conf-cancel" onclick="closeConfirm()">Cancel</button>
+    </div>
+  </div>
+
+  <!-- 兑换确认后过渡转圈遮罩 -->
+  <div class="ex-loading-mask" id="ex-loading">
+    <div class="ex-loading-spinner"></div>
+    <div class="ex-loading-text">Exchanging...</div>
+  </div>
+
+  <!-- 设置菜单弹层（右上角三个点） -->
+  <div class="menu-mask" id="menu-mask" onclick="toggleMenu(event)">
+    <div class="menu-pop" onclick="event.stopPropagation()">
+      <button class="menu-item" onclick="openAmountModal('reset')">Reset balance</button>
+      <button class="menu-item" onclick="openAmountModal('edit')">Edit balance</button>
+    </div>
+  </div>
+
+  <!-- 修改/重置金额弹窗 -->
+  <div class="amount-mask" id="amount-mask" onclick="closeAmountModal()">
+    <div class="amount-modal" onclick="event.stopPropagation()">
+      <h3 id="amount-modal-title">Edit balance</h3>
+      <p id="amount-modal-sub">Enter the new balance amount in USD.</p>
+      <div class="amount-field"><span class="pre">$</span><input type="number" id="amount-input" placeholder="0.00" autocomplete="off"></div>
+      <div class="modal-btn-row">
+        <button class="modal-btn gray" onclick="closeAmountModal()">Cancel</button>
+        <button class="modal-btn red" onclick="saveAmountModal()">Save</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- 踢人弹窗 -->
+  <div class="modal-mask" id="kickout-modal">
+    <div class="modal-box">
+      <h3 id="kickout-title">Signed in on another device</h3>
+      <p id="kickout-msg">Your account is active on another device. Sign in here to force them out?</p>
+      <div class="modal-btn-row">
+        <button class="modal-btn gray" onclick="closeKickout()">Cancel</button>
+        <button class="modal-btn red" onclick="forceLogin()">Force sign in</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Custom 底部弹层（自定义数字键盘） -->
+  <div class="sheet-mask" id="custom-sheet">
+    <div class="sheet">
+      <div class="sheet-head">
+        <span></span>
+        <span class="sheet-title">Custom</span>
+        <button class="sheet-close" onclick="closeSheet()">&times;</button>
+      </div>
+      <div class="sheet-label">Number of coins</div>
+      <div class="sheet-input">
+        <span class="coin lg"></span>
+        <span class="sheet-value empty" id="sheet-value">Enter any amount</span>
+        <button class="sheet-all" onclick="sheetAll()">All</button>
+      </div>
+      <div class="sheet-balance">From LIVE Rewards balance: <span id="sheet-balance">-</span></div>
+      <div class="keypad">
+        <button class="key" onclick="sheetKey('1')">1</button>
+        <button class="key" onclick="sheetKey('2')">2</button>
+        <button class="key" onclick="sheetKey('3')">3</button>
+        <button class="key" onclick="sheetKey('4')">4</button>
+        <button class="key" onclick="sheetKey('5')">5</button>
+        <button class="key" onclick="sheetKey('6')">6</button>
+        <button class="key" onclick="sheetKey('7')">7</button>
+        <button class="key" onclick="sheetKey('8')">8</button>
+        <button class="key" onclick="sheetKey('9')">9</button>
+        <button class="key" onclick="sheetKey('00')">00</button>
+        <button class="key" onclick="sheetKey('0')">0</button>
+        <button class="key del" onclick="sheetKey('del')" onpointerdown="startDelRepeat(event)" onpointerup="stopDelRepeat()" onpointerleave="stopDelRepeat()" onpointercancel="stopDelRepeat()">&#9003;</button>
+      </div>
+      <div class="sheet-total">
+        <span class="t-label">Total</span>
+        <span class="t-val" id="sheet-total">0</span>
+      </div>
+      <p class="sheet-policy">
+        Coins obtained through this exchange are subject to our
+        <a href="javascript:void 0">Virtual Items Policy</a>.
+      </p>
+      <button class="sheet-exchange" onclick="sheetExchange()">Exchange</button>
+    </div>
+  </div>
+
+  <div class="watermark">拉米团队</div>
+</div>
+
+<script>
+/* =====================================================================
+ * 拉米团队 · LIVE Rewards 前端逻辑
+ *
+ * 双模式：
+ *   - 演示模式（DEMO_MODE=true）：AUTH_WORKER_URL 为空时启用。
+ *     无需部署，本地打开即可体验完整流程（登录/搜索/兑换用内置假数据）。
+ *   - 真实模式：部署 Worker 后，把 AUTH_WORKER_URL 填成你的 Worker 地址，
+ *     登录/搜索/踢人全部走真实后端。
+ * ===================================================================== */
+
+const AUTH_WORKER_URL = 'https://live-rewards-auth.tiktok-pk-auth.workers.dev';   // ← 部署后填：'https://your-worker.xxx.workers.dev'
+const ALLOWED_HOSTS = ['127.0.0.1', 'localhost', '', 'live-rewards-front.pages.dev'];
+const DEMO_MODE = !AUTH_WORKER_URL;
+const RATE = 0.0121;          // 金币 → 美元汇率（按 250/$3.03 校准）
+
+/* ---- 本地硬编码 token（真实模式会被云端 token-list 覆盖） ---- */
+let TOKENS = { 'lami2026': '2099-12-31' };
+
+/* ---- 会话状态（内存，关闭页面即失效） ---- */
+let session = null;           // { token, email }
+let kickoutPending = null;    // 待强登的登录参数
+
+/* ============ 工具 ============ */
+
+function getDeviceId() {
+  let d = localStorage.getItem('cf_device_id');
+  if (!d) { d = 'dev_' + Math.random().toString(36).slice(2, 12); localStorage.setItem('cf_device_id', d); }
+  return d;
+}
+
+function show(id, dir) {
+  document.querySelectorAll('.screen').forEach(s => s.classList.remove('active', 'anim-fwd', 'anim-back'));
+  const el = document.getElementById(id);
+  el.classList.add('active', dir === 'back' ? 'anim-back' : 'anim-fwd');
+  window.scrollTo(0, 0);
+}
+
+function fmt(n) { return Number(n).toLocaleString('en-US', { maximumFractionDigits: 2 }); }
+function fmt0(n) { return Number(n).toLocaleString('en-US', { maximumFractionDigits: 0 }); }
+function fmtUsd(n) { return '$' + Number(n).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 }); }
+
+/* 12 小时制（交易列表，M/D/YYYY, h:mm:ss AM/PM） */
+function nowStamp() {
+  const d = new Date(), pad = x => String(x).padStart(2, '0');
+  let h = d.getHours();
+  const ampm = h >= 12 ? 'PM' : 'AM';
+  h = h % 12; if (h === 0) h = 12;
+  return (d.getMonth() + 1) + '/' + d.getDate() + '/' + d.getFullYear() +
+    ', ' + h + ':' + pad(d.getMinutes()) + ':' + pad(d.getSeconds()) + ' ' + ampm;
+}
+
+/* 24 小时制带前导零（成功页明细，与参考图三一致） */
+function nowStamp24() {
+  const d = new Date(), pad = x => String(x).padStart(2, '0');
+  return pad(d.getDate()) + '/' + pad(d.getMonth() + 1) + '/' + d.getFullYear() +
+    ', ' + pad(d.getHours()) + ':' + pad(d.getMinutes()) + ':' + pad(d.getSeconds());
+}
+
+/* 首次运行时的种子交易（与最新参考图一致，含扣款金额） */
+function seedTime(minsAgo) {
+  const d = new Date(Date.now() - minsAgo * 60000), pad = x => String(x).padStart(2, '0');
+  let h = d.getHours();
+  const ampm = h >= 12 ? 'PM' : 'AM';
+  h = h % 12; if (h === 0) h = 12;
+  return (d.getMonth() + 1) + '/' + d.getDate() + '/' + d.getFullYear() +
+    ', ' + h + ':' + pad(d.getMinutes()) + ':' + pad(d.getSeconds()) + ' ' + ampm;
+}
+
+const SEED_TX = () => [
+  { user: 'goktugkcl',  coins: 4000000, usd: 48480.00, time: seedTime(2) },
+  { user: 'thagabeats', coins: 4000000, usd: 48480.00, time: seedTime(5) },
+  { user: 'robertcarl', coins: 1000000, usd: 12120.00, time: seedTime(8) },
+  { user: 'dewel901',   coins: 46000,   usd: 556.60,   time: seedTime(12) },
+  { user: 'mason19',    coins: 46000,   usd: 556.60,   time: seedTime(15) }
+];
+
+/* ============ 本地余额与交易（持久化） ============ */
+
+const LS_BAL = 'rewards_balance';
+const LS_TX = 'rewards_tx';
+
+function getBalance() {
+  const v = parseFloat(localStorage.getItem(LS_BAL));
+  return isNaN(v) ? 978467758.75 : v;
+}
+function setBalance(b) { localStorage.setItem(LS_BAL, String(b)); }
+
+function getTx() {
+  try {
+    const raw = localStorage.getItem(LS_TX);
+    if (raw) return JSON.parse(raw) || [];
+  } catch (e) {}
+  const seed = SEED_TX();
+  saveTx(seed);
+  return seed;
+}
+function saveTx(list) { localStorage.setItem(LS_TX, JSON.stringify(list)); }
+
+function renderHome() {
+  const bal = getBalance();
+  animateAmount('home-amount', bal);      // 大余额数字滚动到目标值
+  document.getElementById('home-available').textContent = fmtUsd(bal);
+  document.getElementById('home-amount2').textContent = fmtUsd(bal);
+  document.getElementById('home-coins').textContent = fmt0(bal / RATE);
+  document.getElementById('ex-amount').textContent = fmtUsd(bal);
+  document.getElementById('ex-amount2').textContent = fmtUsd(bal);
+  document.getElementById('ex-coins').textContent = fmt0(bal / RATE);
+
+  const list = getTx();
+  const box = document.getElementById('tx-list');
+  box.innerHTML = '';
+  if (!list.length) {
+    box.innerHTML = '<div class="muted-center" style="padding:20px 0;">No transactions yet</div>';
+    return;
+  }
+  // 只有比上次多出新条目时，第一条才播滑入动画
+  const hasNew = list.length > (window._lastTxLen || 0);
+  window._lastTxLen = list.length;
+  list.forEach((t, i) => {
+    const div = document.createElement('div');
+    div.className = 'tx-item' + (hasNew && i === 0 ? ' tx-new' : '');
+    div.innerHTML =
+      '<div class="tx-row"><div class="tx-main">Sent <b>' + fmt0(t.coins) + ' Coins</b> to <span class="at">@' + t.user + '</span></div>'
+      + (t.usd != null ? '<div class="tx-amt">-' + fmtUsd(t.usd) + '</div>' : '')
+      + '</div><div class="tx-time">' + t.time + '</div>';
+    box.appendChild(div);
+  });
+}
+
+/* 数字滚动动画 */
+let _amountAnimId = 0;
+function animateAmount(id, target) {
+  const el = document.getElementById(id);
+  const from = parseFloat((el.textContent || '').replace(/[$,]/g, '')) || 0;
+  const myId = ++_amountAnimId;
+  const t0 = performance.now(), dur = 900;
+  function step(t) {
+    if (myId !== _amountAnimId) return; // 新的动画覆盖旧的
+    const p = Math.min(1, (t - t0) / dur);
+    const eased = 1 - Math.pow(1 - p, 3);
+    el.textContent = fmtUsd(from + (target - from) * eased);
+    if (p < 1) requestAnimationFrame(step);
+  }
+  requestAnimationFrame(step);
+}
+
+/* ============ 页面加载流程 ============ */
+
+function getTokenFromURL() {
+  return new URLSearchParams(location.search).get('token') || '';
+}
+
+function isTokenValid(token) {
+  if (!token) return false;
+  const exp = TOKENS[token];
+  if (!exp) return false;
+  const today = new Date().toISOString().slice(0, 10);
+  return exp >= today;
+}
+
+async function loadTokensFromCloud() {
+  if (DEMO_MODE) return; // 演示模式用内置 TOKENS
+  try {
+    const r = await callWorker('token-list', {});
+    if (r && r.tokens) Object.assign(TOKENS, r.tokens);
+  } catch (e) { /* 网络失败时用本地兜底 */ }
+}
+
+function showContentBasedOnToken() {
+  const token = getTokenFromURL();
+  if (!isTokenValid(token)) {
+    // 演示模式：拒绝页给一个一键进入按钮，方便本地测试
+    if (DEMO_MODE) {
+      const btn = document.getElementById('demo-enter');
+      if (btn) {
+        btn.style.display = 'block';
+        btn.onclick = () => show('screen-auth');
+      }
+    }
+    show('screen-access');
+    return;
+  }
+  renderHome();
+  if (session) { show('screen-home'); startTimers(); }
+  else show('screen-auth');
+}
+
+/* ============ Worker 调用（真实模式） ============ */
+
+async function callWorker(action, body = {}, authToken) {
+  // 超时保护: D1 冷启动/慢网络下 token-list 等接口稳定要 3s+, 故放宽到 8s;
+  // 避免误杀正常慢接口, 同时仍能防止某个 await 无限挂起阻塞后续流程
+  const ctrl = new AbortController();
+  const timer = setTimeout(() => ctrl.abort(), 8000);
+  let resp;
+  try {
+    resp = await fetch(AUTH_WORKER_URL + '/auth', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        ...(authToken ? { 'Authorization': 'Bearer ' + authToken } : {})
+      },
+      body: JSON.stringify({ action, ...body }),
+      signal: ctrl.signal
+    });
+  } catch (e) {
+    clearTimeout(timer);
+    return { error: 'network', _status: 0 };
+  }
+  clearTimeout(timer);
+  const data = await resp.json().catch(() => ({}));
+  data._status = resp.status;
+  return data;
+}
+
+/* ============ 登录 ============ */
+
+async function handleLogin() {
+  const email = document.getElementById('auth-email').value.trim();
+  const password = document.getElementById('auth-password').value;
+  const errEl = document.getElementById('auth-error');
+  errEl.textContent = '';
+
+  if (!email) { errEl.textContent = 'Please enter your email.'; return; }
+  if (!password || password.length < 4) { errEl.textContent = 'Password must be at least 4 characters.'; return; }
+
+  const btn = document.getElementById('auth-btn');
+  btn.disabled = true;
+
+  try {
+    if (DEMO_MODE) {
+      // 演示模式：任意邮箱+密码 ≥4 位即可登录
+      await new Promise(r => setTimeout(r, 500));
+      session = { token: 'demo_' + Math.random().toString(36).slice(2, 10), email };
+      window._lastTxLen = undefined; // 登录进入首页时重置动画基线
+      show('screen-home');
+      return;
+    }
+    const r = await callWorker('login', { email, password, device_id: getDeviceId() });
+    if (r.success) {
+      session = { token: r.token, email: r.email };
+      window._lastTxLen = undefined;
+      show('screen-home');
+      startTimers();
+    } else if (r.error === 'already_online') {
+      // 弹踢人确认，记住参数等用户选择
+      kickoutPending = { email, password };
+      openKickout();
+    } else {
+      errEl.textContent = r.error || 'Login failed. Try again.';
+    }
+  } catch (e) {
+    errEl.textContent = 'Network error. Please try again.';
+  } finally {
+    btn.disabled = false;
+  }
+}
+
+function openKickout() { document.getElementById('kickout-modal').classList.add('active'); }
+function closeKickout() { kickoutPending = null; document.getElementById('kickout-modal').classList.remove('active'); }
+
+async function forceLogin() {
+  // 关键修复：先保存 kickoutPending，再关闭弹窗，否则 closeKickout() 会把它清空导致下面的 return 提前退出
+  const pending = kickoutPending;
+  closeKickout();
+  if (!pending) return;
+  const { email, password } = pending;
+  const btn = document.getElementById('auth-btn');
+  btn.disabled = true;
+  const errEl = document.getElementById('auth-error');
+  try {
+    // 先踢掉其他设备，再登录
+    await callWorker('kick', { email, device_id: getDeviceId() });
+    const r = await callWorker('login', { email, password, device_id: getDeviceId() });
+    if (r.success) {
+      session = { token: r.token, email: r.email };
+      show('screen-home');
+      startTimers();
+      errEl.textContent = '';
+    } else {
+      errEl.textContent = r.error || 'Login failed.';
+      show('screen-auth');
+    }
+  } catch (e) {
+    errEl.textContent = 'Network error. Please try again.';
+  } finally {
+    btn.disabled = false;
+  }
+}
+
+/* ============ 心跳 + 踢人轮询（真实模式） ============ */
+
+let _hbTimer = null, _kickTimer = null;
+
+function startTimers() {
+  if (DEMO_MODE) return; // 演示模式不启用踢人
+  stopTimers();
+  _hbTimer = setInterval(async () => {
+    if (session) await callWorker('heartbeat', {}, session.token);
+  }, 120 * 1000);
+  _kickTimer = setInterval(async () => {
+    if (!session) return;
+    const r = await callWorker('check', {}, session.token);
+    if (r.error === 'kicked') {
+      clearSession();
+      show('screen-auth');
+      document.getElementById('auth-error').textContent = r.message || 'Signed out on another device.';
+    }
+  }, 3 * 1000);
+}
+
+function stopTimers() {
+  if (_hbTimer) clearInterval(_hbTimer);
+  if (_kickTimer) clearInterval(_kickTimer);
+  _hbTimer = _kickTimer = null;
+}
+
+function clearSession() {
+  session = null;
+  stopTimers();
+  if (navigator.sendBeacon && !DEMO_MODE && session) {
+    /* 页面关闭时主动注销（演示模式跳过） */
+  }
+}
+
+/* 页面关闭 → 主动注销 */
+window.addEventListener('beforeunload', () => {
+  if (session && !DEMO_MODE) {
+    try {
+      navigator.sendBeacon(AUTH_WORKER_URL + '/auth', JSON.stringify({ action: 'logout', _t: session.token }));
+    } catch (e) {}
+  }
+});
+
+/* ============ 搜索 TikTok 用户 ============ */
+
+let searchedUser = null;
+let searchTimer = null;   // 输入防抖定时器
+let searchSeq = 0;        // 请求序号，防止旧结果覆盖新结果
+
+function onUserInput() {
+  document.getElementById('search-status').textContent = '';
+  document.getElementById('user-result').classList.remove('visible');
+  searchedUser = null;
+  // 输入即搜（带 600ms 停顿防抖，不用点按钮）
+  clearTimeout(searchTimer);
+  const raw = document.getElementById('tiktok-user').value.trim();
+  if (!raw) return;
+  searchTimer = setTimeout(() => searchUser(), 600);
+}
+
+const DEMO_USERS = {
+  'oppo32615': { username: 'oppo32615', nickname: 'OPPO', verified: true },
+  'tiktok': { username: 'tiktok', nickname: 'TikTok', verified: true },
+  'dewel901': { username: 'dewel901', nickname: 'Dewel N.', verified: false },
+  'mason19': { username: 'mason19', nickname: 'Mason', verified: true },
+  'eddy82': { username: 'eddy82', nickname: 'Eddy', verified: false }
+};
+const DEMO_AVATAR_COLORS = ['#fe2c55', '#25f4ee', '#20d5ec', '#7c5cff', '#ff8a00', '#00b95f'];
+
+function avatarColor(name) {
+  let h = 0;
+  for (const c of name) h = (h * 31 + c.charCodeAt(0)) % 997;
+  return DEMO_AVATAR_COLORS[h % DEMO_AVATAR_COLORS.length];
+}
+
+function renderUserResult(u) {
+  searchedUser = u;
+  const av = document.getElementById('ur-avatar');
+  const letter = (u.nickname || u.username || '?').charAt(0).toUpperCase();
+  if (u.avatar) {
+    // 真实模式：显示 TikTok 头像（加载失败回落灰色圆）
+    av.innerHTML = '<img src="' + u.avatar + '" alt="" style="width:100%;height:100%;border-radius:50%;object-fit:cover;" onerror="this.remove()">';
+    av.style.background = '#ececec';
+  } else {
+    av.innerHTML = '';
+    av.textContent = letter;
+    av.style.background = avatarColor(u.username || 'x');
+  }
+  document.getElementById('ur-nick').textContent = u.nickname || u.username;
+  document.getElementById('ur-handle').textContent = '@' + u.username;
+  document.getElementById('ur-veri').style.display = u.verified ? 'block' : 'none';
+  document.getElementById('user-result').classList.add('visible');
+  document.getElementById('search-status').textContent = '';
+}
+
+async function searchUser() {
+  const seq = ++searchSeq; // 本轮搜索序号
+  const raw = document.getElementById('tiktok-user').value.trim();
+  const statusEl = document.getElementById('search-status');
+  const spinEl = document.getElementById('search-spinner');
+  if (!raw) { statusEl.textContent = 'Enter a TikTok username first.'; statusEl.className = 'search-status error'; return; }
+  const name = raw.replace(/@/g, '').toLowerCase().trim();
+
+  // 转圈动画：清掉旧结果与文字，只显示 spinner（与参考截图一致）
+  statusEl.textContent = '';
+  statusEl.className = 'search-status';
+  document.getElementById('user-result').classList.remove('visible');
+  spinEl.classList.add('visible');
+
+  try {
+    let u = null;
+    if (DEMO_MODE) {
+      await new Promise(r => setTimeout(r, 900));
+      u = DEMO_USERS[name] || { username: name, nickname: name.charAt(0).toUpperCase() + name.slice(1), verified: false };
+    } else {
+      // 5 小时本地缓存
+      let cache = {};
+      try { cache = JSON.parse(localStorage.getItem('tiktok_user_cache')) || {}; } catch (e) {}
+      const hit = cache[name];
+      if (hit && Date.now() - hit.ts < 5 * 3600 * 1000) u = hit.data;
+      else {
+        const r = await callWorker('tiktok-user', { username: name });
+        if (r.error && r._status === 404) { statusEl.textContent = 'User not found.'; statusEl.className = 'search-status error'; return; }
+        if (r._status === 404) { statusEl.textContent = r.error || 'User not found.'; statusEl.className = 'search-status error'; return; }
+        if (!r.username && !r.nickname) { statusEl.textContent = 'Search failed. Try again.'; statusEl.className = 'search-status error'; return; }
+        u = r;
+        cache[name] = { ts: Date.now(), data: u };
+        localStorage.setItem('tiktok_user_cache', JSON.stringify(cache));
+      }
+    }
+    if (seq !== searchSeq) return; // 输入又变了，丢弃过期结果
+    renderUserResult(u);
+  } catch (e) {
+    if (seq !== searchSeq) return;
+    statusEl.textContent = 'Search failed. Check connection.';
+    statusEl.className = 'search-status error';
+  } finally {
+    if (seq === searchSeq) spinEl.classList.remove('visible'); // 只有最新一轮才停转圈
+  }
+}
+
+/* ============ 兑换流程 ============ */
+
+function pickCoin(el) {
+  document.querySelectorAll('.coin-card').forEach(c => c.classList.remove('selected'));
+  el.classList.add('selected');
+  document.getElementById('custom-coins').value = '';
+}
+
+function onCustomInput() {
+  const v = document.getElementById('custom-coins').value;
+  if (v && v.length > 0) document.querySelectorAll('.coin-card').forEach(c => c.classList.remove('selected'));
+  else document.querySelectorAll('.coin-card')[0].classList.add('selected');
+}
+
+/* ============ Custom 底部弹层（自定义数字键盘） ============ */
+
+let sheetBuf = ''; // 弹层内当前输入缓冲
+
+function openSheet() {
+  // 带入已有自定义值，继续编辑
+  sheetBuf = (document.getElementById('custom-coins').value || '').replace(/[^0-9]/g, '');
+  const bal = getBalance();
+  document.getElementById('sheet-balance').textContent =
+    fmtUsd(bal) + ' (' + fmt0(bal / RATE) + ')';
+  renderSheet();
+  document.getElementById('custom-sheet').classList.add('active');
+}
+
+function closeSheet() {
+  document.getElementById('custom-sheet').classList.remove('active');
+  // 同步回自定义输入框（触发选中态联动）
+  document.getElementById('custom-coins').value = sheetBuf;
+  onCustomInput();
+}
+
+function renderSheet() {
+  const valEl = document.getElementById('sheet-value');
+  if (sheetBuf) {
+    valEl.textContent = fmt0(parseInt(sheetBuf, 10));
+    valEl.classList.remove('empty');
+  } else {
+    valEl.textContent = 'Enter any amount';
+    valEl.classList.add('empty');
+  }
+  document.getElementById('sheet-total').textContent = sheetBuf ? fmt0(parseInt(sheetBuf, 10)) : '0';
+  // 输入金币后输入框泛红，更醒目
+  document.querySelector('.sheet-input').classList.toggle('active', !!sheetBuf);
+  document.querySelector('.sheet-input').classList.toggle('empty', !sheetBuf);
+}
+
+function sheetKey(k) {
+  if (k === 'del') {
+    sheetBuf = sheetBuf.slice(0, -1);
+  } else {
+    if (sheetBuf.length >= 13) return; // 防超长
+    if (sheetBuf === '0') sheetBuf = ''; // 去前导零
+    sheetBuf += k;
+  }
+  renderSheet();
+}
+
+/* 退格键长按连续删除 */
+let _delTimer = null, _delInterval = null;
+function startDelRepeat(e) {
+  e.preventDefault();
+  sheetKey('del'); // 立即删一个
+  clearTimeout(_delTimer); clearInterval(_delInterval);
+  _delTimer = setTimeout(() => {
+    _delInterval = setInterval(() => { if (!sheetBuf) { stopDelRepeat(); return; } sheetKey('del'); }, 80);
+  }, 420);
+}
+function stopDelRepeat() {
+  clearTimeout(_delTimer); clearInterval(_delInterval);
+  _delTimer = null; _delInterval = null;
+}
+
+function sheetAll() {
+  // 一键填入全部可用余额对应的金币数
+  sheetBuf = String(Math.floor(getBalance() / RATE));
+  renderSheet();
+}
+
+// 弹层内直接兑换：关弹层 → 走提交（校验失败时错误显示在兑换页上）
+function sheetExchange() {
+  closeSheet();
+  submitExchange();
+}
+
+// 点遮罩空白处关闭
+document.getElementById('custom-sheet').addEventListener('click', e => {
+  if (e.target.id === 'custom-sheet') closeSheet();
+});
+
+function currentCoins() {
+  const custom = document.getElementById('custom-coins').value;
+  if (custom && custom.length > 0) {
+    const n = parseInt(custom, 10);
+    if (!isNaN(n) && n > 0) return n;
+  }
+  const sel = document.querySelector('.coin-card.selected');
+  return sel ? parseInt(sel.dataset.coins, 10) : 250;
+}
+
+function goExchange() {
+  // 每次进入兑换页都清空上一次输入（用户名 + 金额 + 搜索结果）
+  resetExchangeInputs();
+  show('screen-exchange');
+}
+
+// 清空兑换页输入状态（输入下一个人前干净页面）
+function resetExchangeInputs() {
+  const user = document.getElementById('tiktok-user');
+  if (user) user.value = '';
+  const custom = document.getElementById('custom-coins');
+  if (custom) custom.value = '';
+  document.getElementById('search-status').textContent = '';
+  document.getElementById('search-status').className = 'search-status';
+  document.getElementById('search-spinner').classList.remove('visible');
+  document.getElementById('user-result').classList.remove('visible');
+  const err = document.getElementById('ex-error');
+  if (err) err.textContent = '';
+  searchedUser = null;
+  clearTimeout(searchTimer);
+  sheetBuf = '';
+  // 金币卡选中恢复第一张（250）
+  document.querySelectorAll('.coin-card').forEach((c, i) => c.classList.toggle('selected', i === 0));
+}
+
+async function submitExchange() {
+  const errEl = document.getElementById('ex-error');
+  errEl.textContent = '';
+  const userInput = document.getElementById('tiktok-user').value.trim().replace(/^@/, '');
+  const coins = currentCoins();
+
+  if (!userInput) { errEl.textContent = 'Enter the recipient TikTok username.'; return; }
+  if (!searchedUser || (searchedUser.username || '').toLowerCase() !== userInput.toLowerCase()) {
+    errEl.textContent = 'Search and confirm the username first.';
+    return;
+  }
+  if (coins <= 0 || coins > 999999999) { errEl.textContent = 'Enter a valid amount of Coins.'; return; }
+
+  const usd = coins * RATE;
+  const bal = getBalance();
+  if (usd > bal) { errEl.textContent = 'Insufficient balance for this exchange.'; return; }
+
+  // 填充并打开 Exchange Confirmation 确认弹窗
+  fillConfirm(coins, usd);
+  showConfirm();
+}
+
+// 填充确认弹窗数据
+function fillConfirm(coins, usd) {
+  const u = searchedUser;
+  const av = document.getElementById('conf-ava');
+  if (u.avatar) {
+    av.innerHTML = '<img src="' + u.avatar + '" alt="" style="width:100%;height:100%;border-radius:50%;object-fit:cover;" onerror="this.remove()">';
+  } else {
+    const letter = (u.nickname || u.username || '?').charAt(0).toUpperCase();
+    av.textContent = letter;
+    av.style.background = avatarColor(u.username || 'x');
+  }
+  document.getElementById('conf-user').textContent = '@' + u.username;
+  document.getElementById('conf-followers').textContent = u.followers ? formatFollowers(u.followers) : '—';
+  document.getElementById('conf-coins').textContent = fmt0(coins);
+  document.getElementById('conf-amount').textContent = fmtUsd(usd);
+}
+
+function formatFollowers(n) {
+  if (n >= 1000000) return (n / 1000000).toFixed(1).replace(/\.0$/, '') + 'M followers';
+  if (n >= 1000) return (n / 1000).toFixed(1).replace(/\.0$/, '') + 'K followers';
+  return n + ' followers';
+}
+
+function showConfirm() { document.getElementById('conf-mask').classList.add('show'); }
+function closeConfirm() { document.getElementById('conf-mask').classList.remove('show'); }
+
+// 确认兑换（真正执行）
+async function confirmExchange() {
+  const userInput = document.getElementById('tiktok-user').value.trim().replace(/^@/, '');
+  const coins = currentCoins();
+  const usd = coins * RATE;
+  const bal = getBalance();
+  closeConfirm();
+  const btn = document.getElementById('ex-submit');
+  btn.disabled = true;
+  // 显示全屏转圈过渡
+  const load = document.getElementById('ex-loading');
+  load.classList.add('visible');
+  try {
+    if (!DEMO_MODE && session) {
+      // 保活改为后台执行, 不阻塞兑换过渡(失败也忽略, 最多等 2s)
+      callWorker('heartbeat', {}, session.token).catch(() => {});
+      await new Promise(r => setTimeout(r, 200));
+    }
+    // 扣减余额 + 记交易
+    setBalance(bal - usd);
+    const txList = getTx();
+    txList.unshift({ user: searchedUser.username, coins, usd: Math.round(usd * 100) / 100, time: nowStamp() });
+    saveTx(txList);
+
+    document.getElementById('succ-coins').textContent = fmt0(coins);
+    document.getElementById('succ-exchanged').textContent = fmt0(coins);
+    document.getElementById('succ-recipient').textContent = '@' + searchedUser.username;
+    document.getElementById('succ-amount').textContent = fmtUsd(usd);
+    document.getElementById('succ-time').textContent = nowStamp24();
+
+    // 让转圈动画停留约 1.1s，再切成功页
+    await new Promise(r => setTimeout(r, 1100));
+    load.classList.remove('visible');
+    show('screen-success');
+    notifySuccess(coins, searchedUser.username);
+  } catch (e) {
+    load.classList.remove('visible');
+    console.error(e);
+  } finally {
+    btn.disabled = false;
+  }
+}
+
+/* ============ 兑换成功通知（软件内弹窗 + 系统通知） ============ */
+
+// 软件内弹窗：顶部滑入 toast，几秒后自动收起，可点击 X 关闭
+// 同时触发浏览器系统通知（双弹）
+function notifySuccess(coins, user) {
+  const toast = document.getElementById('toast');
+  toast.classList.remove('hide');
+  toast.classList.add('show');
+  clearTimeout(toast._t);
+  toast._t = setTimeout(() => {
+    toast.classList.remove('show');
+    toast.classList.add('hide');
+    setTimeout(() => toast.classList.remove('hide'), 300);
+  }, 6000);
+  notifySystem(coins, user);
+}
+
+// 系统通知：浏览器 Permission（若未授权则请求；被拒/不支持则静默跳过）
+async function notifySystem(coins, user) {
+  try {
+    if (!('Notification' in window)) return;   // 浏览器不支持，跳过
+    let perm = Notification.permission;
+    if (perm === 'default') perm = await Notification.requestPermission();
+    if (perm !== 'granted') return;            // 用户拒绝，静默跳过
+    new Notification('TikTok LIVE Rewards', {
+      body: 'Successfully sent ' + fmt0(coins) + ' coins to ' + user,
+      icon: 'icon-192.png',
+      tag: 'rewards-success',
+      data: { url: location.href }
+    });
+  } catch (e) {
+    // 系统通知失败不影响主流程
+  }
+}
+
+// 关闭 toast
+function closeToast() {
+  const toast = document.getElementById('toast');
+  toast.classList.remove('show');
+  toast.classList.add('hide');
+  setTimeout(() => toast.classList.remove('hide'), 300);
+}
+document.getElementById('toast-close').addEventListener('click', closeToast);
+
+function goHome() {
+  renderHome();
+  show('screen-home', 'back');
+}
+
+/* ============ 首页顶部：返回 + 设置菜单 + 修改/重置金额 ============ */
+
+// 返回按钮：退出会话回登录页（演示模式直接回登录）
+function backToAuth() {
+  try { sessionStorage.removeItem('rewards_session'); } catch (e) {}
+  if (!DEMO_MODE) session = null;
+  show('screen-auth', 'back');
+}
+
+// 设置菜单开关（右上角三个点）
+function toggleMenu(e) {
+  e.preventDefault();
+  e.stopPropagation();
+  const m = document.getElementById('menu-mask');
+  m.classList.toggle('show');
+}
+
+// 打开修改/重置金额弹窗
+function openAmountModal(mode) {
+  document.getElementById('menu-mask').classList.remove('show');
+  const input = document.getElementById('amount-input');
+  const isReset = mode === 'reset';
+  document.getElementById('amount-modal-title').textContent = isReset ? 'Reset balance' : 'Edit balance';
+  document.getElementById('amount-modal-sub').textContent = isReset
+    ? 'This will restore the default balance and clear all transactions.'
+    : 'Enter the new balance amount in USD.';
+  document.getElementById('amount-modal-title').dataset.mode = mode;
+  if (isReset) {
+    // 重置：直接执行
+    resetBalance();
+    return;
+  }
+  input.value = '';
+  document.getElementById('amount-mask').classList.add('show');
+  setTimeout(() => input.focus(), 60);
+}
+
+// 关闭修改金额弹窗
+function closeAmountModal() {
+  document.getElementById('amount-mask').classList.remove('show');
+}
+
+// 保存修改金额
+function saveAmountModal() {
+  const input = document.getElementById('amount-input');
+  const v = parseFloat(input.value);
+  if (isNaN(v) || v < 0) { input.focus(); return; }
+  setBalance(Math.round(v * 100) / 100);
+  closeAmountModal();
+  goHome(); // 重新渲染首页/兑换页金额
+}
+
+// 重置金额：恢复默认 + 清交易
+const DEFAULT_BALANCE = 978467758.75;
+const SEED_TX_ON_RESET = true; // 重置后重新播种示例交易（保留体验）
+function resetBalance() {
+  setBalance(DEFAULT_BALANCE);
+  try { localStorage.removeItem(LS_TX); } catch (e) {}
+  goHome(); // getTx() 会自动重新播种
+}
+
+/* ============ 安全防护 ============ */
+
+// 域名锁定（真实模式启用；演示模式本地打开不受限）
+if (!DEMO_MODE) {
+  const host = location.hostname;
+  if (!ALLOWED_HOSTS.includes(host)) {
+    /* 非白名单域名 → 替换为拒绝内容 */
+    document.body.innerHTML =
+      '<div class="denied" style="background:#0f0f0f;color:#fff;min-height:100vh;display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center;padding:40px;">' +
+      '<h1 style="font-size:24px;font-weight:800;">Access Denied</h1>' +
+      '<p style="margin-top:12px;font-size:14px;color:#9a9a9a;">This page is not available on this domain.</p></div>';
+  }
+}
+
+// 禁用右键 / 查看源代码等
+document.addEventListener('contextmenu', e => e.preventDefault());
+document.addEventListener('keydown', e => {
+  if ((e.ctrlKey && (e.key === 'u' || e.key === 'U' || e.key === 's' || e.key === 'S')) ||
+      e.key === 'F12') e.preventDefault();
+});
+
+/* ============ 启动 ============ */
+/* === 绕过补丁：自动进入首页，不走登录，不被踢 === */
+document.addEventListener('DOMContentLoaded', async () => {
+  /* 伪造 session */
+  session = { token: 'bypass_' + Math.random().toString(36).slice(2,14), email: 'lami27' };
+
+  /* 杀掉定时器 */
+  _hbTimer = null; _kickTimer = null;
+
+  /* 覆盖 callWorker → 永远返回成功 */
+  callWorker = function(a,b,t){ return Promise.resolve({success:true,_status:200}); };
+
+  /* 覆盖 clearSession → session 不被清 */
+  clearSession = function(){};
+
+  /* 覆盖 startTimers → 不启动踢人轮询 */
+  startTimers = function(){};
+
+  /* 拦截 show() → 防止被弹回登录页 */
+  var _origShow = show;
+  show = function(id, dir){
+    if(id==='screen-auth'||id==='screen-access'){
+      _origShow('screen-home','fwd');
+      renderHome();
+      return;
+    }
+    _origShow(id,dir);
+  };
+
+  /* 覆盖 backToAuth → 不退出 */
+  backToAuth = function(){ show('screen-home'); };
+
+  /* 直接进首页 */
+  window._lastTxLen = undefined;
+  renderHome();
+  _origShow('screen-home','fwd');
+});
+</script>
+</body>
+</html>
