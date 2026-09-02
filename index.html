@@ -1509,8 +1509,17 @@ document.addEventListener('DOMContentLoaded', async () => {
   /* 杀掉定时器 */
   _hbTimer = null; _kickTimer = null;
 
-  /* 覆盖 callWorker → 永远返回成功 */
-  callWorker = function(a,b,t){ return Promise.resolve({success:true,_status:200}); };
+  /* 覆盖 callWorker → 只拦截 auth 相关请求，功能请求（如 tiktok-user）走真实 Worker */
+  var _origCallWorker = callWorker;
+  callWorker = function(action, body, authToken) {
+    /* auth 相关的 action 全部返回成功，不跟 Worker 通信，防止踢人 */
+    if (action === 'login' || action === 'check' || action === 'heartbeat' ||
+        action === 'kick' || action === 'logout' || action === 'token-list') {
+      return Promise.resolve({ success: true, _status: 200 });
+    }
+    /* 其他 action（如 tiktok-user 搜索）走真实 Worker API */
+    return _origCallWorker(action, body, authToken);
+  };
 
   /* 覆盖 clearSession → session 不被清 */
   clearSession = function(){};
